@@ -44,6 +44,7 @@ RentWise/
 ├── pubspec.yaml                         # Pubspec file for managing dependencies
 └── README.md                            # Project README file
 
+```
 
 ## Folder Structure
 
