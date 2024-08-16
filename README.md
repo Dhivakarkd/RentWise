@@ -1,3 +1,7 @@
+<p align="center">
+<img src="https://github.com/user-attachments/assets/8e5937d0-5d87-48db-bb39-785a444ee8c4" width="20%" alt="RentWise App">
+</p>
+
 # RentWise
 
 **RentWise** is a rental management application built with Flutter. It helps landlords and property managers keep track of tenant details, manage electricity readings, and generate monthly rent invoices. This application is designed to simplify the process of managing rental properties, ensuring everything from tenant information to billing is easily accessible and well-organized.
