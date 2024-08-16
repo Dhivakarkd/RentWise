@@ -2,30 +2,37 @@ import 'package:flutter/material.dart';
 import '../data/models/tenant.dart';
 import '../widgets/tenant_card.dart';
 import 'tenant_details_screen.dart';
+import 'add_edit_tenant_screen.dart';
+import '../data/database/database_helper.dart';  // Import the DatabaseHelper
 
-class DashboardScreen extends StatelessWidget {
-  // Dummy data for tenants
-  final List<Tenant> tenants = [
-    Tenant(
-      name: 'John Doe',
-      floorName: '2nd Floor',
-      house: 'A1',
-      electricityBillRate: 10.5,
-      depositAmount: 50000.0,
-      houseRentAmount: 15000.0,
-      electricityReadings: [],
-    ),
-    Tenant(
-      name: 'Jane Smith',
-      floorName: '3rd Floor',
-      house: 'B2',
-      electricityBillRate: 12.0,
-      depositAmount: 45000.0,
-      houseRentAmount: 16000.0,
-      electricityReadings: [],
-    ),
-    // Add more dummy tenants here if needed
-  ];
+class DashboardScreen extends StatefulWidget {
+  @override
+  _DashboardScreenState createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final DatabaseHelper dbHelper = DatabaseHelper.instance;
+  List<Tenant> tenants = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTenants();
+  }
+
+  // Load tenants from the database
+  void _loadTenants() async {
+    final data = await dbHelper.getAllTenants();
+    setState(() {
+      tenants = data;
+    });
+  }
+
+  // Add a new tenant and reload the list
+  void _addTenant(Tenant tenant) async {
+    await dbHelper.insertTenant(tenant);
+    _loadTenants();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +46,6 @@ class DashboardScreen extends StatelessWidget {
           return TenantCard(
             tenant: tenants[index],
             onTap: () {
-              // Navigate to tenant details screen when a card is tapped
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -49,6 +55,20 @@ class DashboardScreen extends StatelessWidget {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final newTenant = await Navigator.push<Tenant>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddEditTenantScreen(),
+            ),
+          );
+          if (newTenant != null) {
+            _addTenant(newTenant);
+          }
+        },
+        child: Icon(Icons.add),
       ),
     );
   }

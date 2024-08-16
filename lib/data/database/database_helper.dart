@@ -4,98 +4,81 @@ import '../models/tenant.dart';
 import '../models/electricity_reading.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper _instance = DatabaseHelper._internal();
-  factory DatabaseHelper() => _instance;
+  static final DatabaseHelper instance = DatabaseHelper._init();
+
   static Database? _database;
 
-  DatabaseHelper._internal();
+  DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
+    _database = await _initDB('rentwise.db');
     return _database!;
   }
 
-  Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'rental_management.db');
+  Future<Database> _initDB(String filePath) async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, filePath);
+
     return await openDatabase(
       path,
       version: 1,
-      onCreate: _onCreate,
+      onCreate: _createDB,
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
+  Future<void> _createDB(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE tenants(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        floorName TEXT,
-        house TEXT,
-        electricityBillRate REAL,
-        depositAmount REAL,
-        houseRentAmount REAL
-      )
-      ''');
+    CREATE TABLE tenants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      floorName TEXT NOT NULL,
+      house TEXT NOT NULL,
+      electricityBillRate REAL NOT NULL,
+      depositAmount REAL NOT NULL,
+      houseRentAmount REAL NOT NULL
+    )
+    ''');
 
     await db.execute('''
-      CREATE TABLE electricity_readings(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tenantId INTEGER,
-        date TEXT,
-        reading INTEGER,
-        FOREIGN KEY (tenantId) REFERENCES tenants (id)
-      )
-      ''');
+    CREATE TABLE electricity_readings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenantId INTEGER NOT NULL,
+      readingDate TEXT NOT NULL,
+      readingValue REAL NOT NULL,
+      FOREIGN KEY (tenantId) REFERENCES tenants (id)
+    )
+    ''');
   }
 
+  // Insert a tenant
   Future<int> insertTenant(Tenant tenant) async {
     final db = await database;
-    int tenantId = await db.insert('tenants', tenant.toMap());
-    // Insert electricity readings
-    for (var reading in tenant.electricityReadings) {
-      await insertElectricityReading(tenantId, reading);
-    }
-    return tenantId;
+    return await db.insert('tenants', tenant.toMap());
   }
 
-  Future<void> insertElectricityReading(
-      int tenantId, ElectricityReading reading) async {
+  // Get all tenants
+  Future<List<Tenant>> getAllTenants() async {
     final db = await database;
-    await db.insert(
-      'electricity_readings',
-      {
-        'tenantId': tenantId,
-        'date': reading.date.toIso8601String(),
-        'reading': reading.reading,
-      },
+    final maps = await db.query('tenants');
+    return maps.map((map) => Tenant.fromMap(map)).toList();
+  }
+
+  // Get a single tenant by ID
+  Future<Tenant?> getTenant(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'tenants',
+      where: 'id = ?',
+      whereArgs: [id],
     );
-  }
-
-  Future<List<Tenant>> getTenants() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('tenants');
-
-    List<Tenant> tenants = [];
-    for (var map in maps) {
-      final List<Map<String, dynamic>> readingMaps = await db.query(
-        'electricity_readings',
-        where: 'tenantId = ?',
-        whereArgs: [map['id']],
-      );
-
-      List<ElectricityReading> readings = readingMaps.map((rm) {
-        return ElectricityReading.fromMap(rm);
-      }).toList();
-
-      Tenant tenant = Tenant.fromMap(map);
-      tenant.electricityReadings = readings;
-      tenants.add(tenant);
+    if (maps.isNotEmpty) {
+      return Tenant.fromMap(maps.first);
     }
-
-    return tenants;
+    return null;
   }
 
+  // Update a tenant
   Future<int> updateTenant(Tenant tenant) async {
     final db = await database;
     return await db.update(
@@ -106,18 +89,36 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> deleteTenant(int id) async {
-  final db = await database;
-  await db.delete(
-    'tenants',
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-  await db.delete(
-    'electricity_readings',
-    where: 'tenantId = ?',
-    whereArgs: [id],
-  );
-}
+  // Delete a tenant
+  Future<int> deleteTenant(int id) async {
+    final db = await database;
+    // Also delete associated electricity readings
+    await db.delete(
+      'electricity_readings',
+      where: 'tenantId = ?',
+      whereArgs: [id],
+    );
+    return await db.delete(
+      'tenants',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
+  // Insert an electricity reading
+  Future<int> insertElectricityReading(ElectricityReading reading) async {
+    final db = await database;
+    return await db.insert('electricity_readings', reading.toMap());
+  }
+
+  // Get all electricity readings for a tenant
+  Future<List<ElectricityReading>> getElectricityReadings(int tenantId) async {
+    final db = await database;
+    final maps = await db.query(
+      'electricity_readings',
+      where: 'tenantId = ?',
+      whereArgs: [tenantId],
+    );
+    return maps.map((map) => ElectricityReading.fromMap(map)).toList();
+  }
 }
